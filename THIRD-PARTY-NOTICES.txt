@@ -1,0 +1,49 @@
+Film Desk 1.1.0 — open-source notices
+
+Film Desk app/engine source: MIT, see source/LICENSE.
+No third-party library source was modified for this build.
+
+Python 3.14.2 — Python Software Foundation License and incorporated notices.
+License: licenses/Python.txt
+Source: https://www.python.org/downloads/release/python-3142/
+
+rawpy 0.27.1 — MIT, copyright Maik Riechert and contributors.
+License: licenses/rawpy.txt
+Source: https://github.com/letmaik/rawpy/tree/v0.27.1
+Documentation: https://letmaik.github.io/rawpy/
+
+LibRaw 0.22.1 — LGPL 2.1 option used, copyright LibRaw LLC and contributors.
+License: licenses/LibRaw.txt
+Source: https://www.libraw.org/download
+Sources: https://github.com/LibRaw/LibRaw
+Bundled via the official rawpy binary wheel.
+
+NumPy 2.5.3 — BSD and incorporated open-source notices.
+License: licenses/NumPy.txt
+Source: https://github.com/numpy/numpy
+
+Pillow 12.3.0 — HPND and incorporated codec notices.
+License: licenses/Pillow.txt
+Source: https://github.com/python-pillow/Pillow
+Pillow supplies JPEG encoding and LittleCMS-based sRGB profile generation.
+
+PySide6-Essentials / Shiboken6 6.12.0 — LGPL 3.0 option used.
+Qt 6.12.0 — LGPL 3.0 option used for the bundled Qt components.
+Copyright The Qt Company Ltd. and Qt/PySide contributors.
+Licenses: licenses/LGPL-3.0.txt and licenses/GPL-3.0.txt
+Sources: https://code.qt.io/cgit/pyside/pyside-setup.git/
+Qt source archives: https://download.qt.io/archive/qt/
+Qt repositories: https://code.qt.io/cgit/qt/
+Qt library modules: Core, Gui, Widgets, Svg, DBus, Network (library dependencies).
+Film Desk itself has no network calls. Qt framework binaries and Python
+extension libraries are dynamically loaded in the app's Contents/Frameworks.
+You may modify/relink/replace the LGPL libraries and reverse engineer Film
+Desk to debug those modifications, under their license terms. App source,
+dependency versions and the build specification are included for rebuilding.
+
+PyInstaller 6.22.3 bootloader — GPL 2 with the distribution exception.
+License/exception: licenses/PyInstaller.txt
+Source: https://github.com/pyinstaller/pyinstaller
+
+All dependencies were obtained from their official PyPI distributions.
+The license files include additional notices for incorporated components.
