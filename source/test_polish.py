@@ -11,8 +11,9 @@ from pathlib import Path
 from unittest.mock import patch
 import numpy as np
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
-from app import FilmDesk, STOCKS, CUSTOM_STOCK
+from PySide6.QtCore import QTimer, QPointF, QEvent, Qt
+from PySide6.QtGui import QMouseEvent
+from app import FilmDesk, PhotoCanvas
 from engine import Frame, Adjustments, atomic_json, render
 
 
@@ -20,6 +21,35 @@ class PolishTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.application=QApplication.instance() or QApplication([])
+
+    def test_picker_overlay_tracks_sample_and_clips_at_image_edge(self):
+        canvas=PhotoCanvas();canvas.resize(900,650);canvas.show()
+        image=np.full((720,1000,3),128,dtype=np.uint8)
+        canvas.set_image(image);canvas.set_mode('neutral')
+        self.application.processEvents()
+        samples=[];canvas.neutral_clicked.connect(samples.append)
+        def move(point):
+            position=QPointF(canvas.rect.left()+point[0]*canvas.rect.width(),
+                             canvas.rect.top()+point[1]*canvas.rect.height())
+            event=QMouseEvent(QEvent.Type.MouseMove,position,position,
+                             Qt.MouseButton.NoButton,Qt.MouseButton.NoButton,Qt.KeyboardModifier.NoModifier)
+            self.application.sendEvent(canvas,event);self.application.processEvents()
+        move([.5,.5])
+        box=canvas.neutral_sample_rect()
+        self.assertAlmostEqual(box.width()/canvas.rect.width()*1000,13)
+        self.assertAlmostEqual(box.height()/canvas.rect.height()*720,13)
+        self.assertEqual(samples,[], 'Hovering must not apply a color correction')
+        canvas.zoom=2;canvas.update();self.application.processEvents()
+        self.assertAlmostEqual(canvas.neutral_sample_rect().width(),box.width()*2)
+        canvas.fit();self.application.processEvents();move([0,0])
+        edge=canvas.neutral_sample_rect()
+        self.assertAlmostEqual(edge.left(),canvas.rect.left())
+        self.assertAlmostEqual(edge.top(),canvas.rect.top())
+        self.assertAlmostEqual(edge.width()/canvas.rect.width()*1000,7)
+        self.application.sendEvent(canvas,QEvent(QEvent.Type.Leave))
+        self.assertTrue(canvas.neutral_sample_rect().isEmpty())
+        canvas.set_mode('view');self.assertIsNone(canvas.sample_point)
+        canvas.close()
 
     def test_slow_folder_discovery_keeps_window_responsive(self):
         entered=threading.Event();release=threading.Event();threads=[]
@@ -81,11 +111,24 @@ class PolishTests(unittest.TestCase):
                 self.assertEqual(w.snapshot()['photos']['photo.ARW'],vars(old))
                 expected,_=render(frame,old)
                 np.testing.assert_array_equal(w.last_pixels,expected)
-                items=[w.stock_combo.itemText(i) for i in range(w.stock_combo.count())]
-                self.assertNotIn('Fuji Pro 400H',items)
-                self.assertNotIn('Fuji Natura 1600',items)
-                self.assertIn('My indie 200',items)
-                self.assertEqual(w.stock_combo.currentText(),CUSTOM_STOCK)
+                self.assertFalse(hasattr(w,'stock_combo'))
+                self.assertFalse(hasattr(w,'light_temperature'))
+                self.assertEqual([w.output_mode_combo.itemText(i) for i in range(w.output_mode_combo.count())],['Color','Black & white'])
+                self.assertEqual(w.output_mode_combo.currentText(),'Color')
+                self.assertIn('Fuji Pro 400H',w.presets)
+                with patch('app.QInputDialog.getItem',return_value=('Fuji Pro 400H',True)):
+                    w.load_preset()
+                drain()
+                self.assertEqual(w.adjustments[w.current].warmth,.2)
+                self.assertEqual(w.adjustments[w.current].crop,old.crop)
+                self.assertEqual(w.adjustments[w.current].neutral_gains,old.neutral_gains)
+                w.undo();drain()
+                self.assertEqual(w.snapshot()['photos']['photo.ARW'],vars(old))
+                w.mode_combo.setCurrentIndex(w.mode_combo.findData('Roll color'));drain()
+                self.assertEqual(w.adjustments[w.current].color_mode,'Auto color')
+                w.set_roll_color();drain()
+                self.assertEqual(w.mode_combo.currentData(),'Roll color')
+                w.undo();drain()
                 self.assertTrue(w.advanced_panel.isHidden())
                 self.assertTrue(w.quality.isHidden())
                 for name in ['tint','shadows','highlights','curve']:
@@ -110,7 +153,6 @@ class PolishTests(unittest.TestCase):
                 self.assertEqual(w.crop_button.text(),'Done cropping')
                 w.crop_button.setChecked(False);w.toggle_crop();drain()
                 self.assertEqual(w.crop_button.text(),'Crop photo')
-                self.assertEqual(len(STOCKS),9)
                 w.write_recovery()
                 w.load_session(data/'last-session.filmdesk');drain()
                 self.assertIsNone(w.session_path,'Recovery should not become the named save destination')

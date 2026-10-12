@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+body {color:#e9edf3; font-family:Arial; font-size:13px; line-height:1.5;}
+h1 {font-size:23px;} h2 {font-size:17px; margin-top:22px;} a {color:#a9dfcf;}
+</style></head><body>
+<h1>How to photograph film</h1>
+<p><b>Example starting setup (Sony A7 IV):</b> RAW still photos, manual exposure, ISO 100, f/8, manual focus, and a fixed 5500 K scanning light. Set camera white balance to 5500 K for a consistent preview. Adjust shutter speed to suit the light; there is no required shutter speed.</p>
+<h2>1. Keep the scanning light consistent</h2>
+<p>5500 K is a practical starting point, not a required calibration value. Keep the light's temperature and brightness fixed during a roll. For a white LED panel, use a high-CRI light with even diffusion. Color temperature describes the appearance of white; two lights marked 5500 K can still give different scan colors because their spectra differ.</p>
+<p>Your diffuser should illuminate the whole frame evenly without a visible pattern. Block light around the frame and keep room-light reflections off the film. Film Desk's blank reference measures overall film-base color; it does not correct uneven illumination or missing spectral information.</p>
+<h2>2. White balance: preview versus conversion</h2>
+<p>For supported camera RAW files, Film Desk does not apply the camera's white-balance setting. It uses fixed channel gains when decoding, then balances the positive during conversion. Changing only camera white balance therefore does not change Film Desk's conversion of the same RAW sensor data.</p>
+<p>White balance still changes your camera's preview and JPEG. A fixed setting makes previews easier to compare. Import the original RAW into Film Desk, rather than a camera JPEG or a processed TIFF. Other conversion software may handle RAW white balance differently.</p>
+<h2>3. Exposure and focus do matter</h2>
+<p>Start at the camera's normal low ISO; ISO 100 is a useful starting point on your A7 IV. Keep ISO and aperture fixed. Use the shutter to collect enough light without clipping any color channel in clear film. Leave some headroom; a camera histogram is based on a processed preview, so also check Film Desk's RAW clipping warning.</p>
+<p>Use a macro lens, a steady stand, flat film, and a camera parallel to the film. Start near f/8 and check center and corner sharpness. Magnify live view and focus on the film grain. Use a timer or remote release.</p>
+<h2>4. Photograph a blank film reference</h2>
+<p>Capture a clear, unexposed but developed section of the same roll through the same holder and diffuser. This is film with no photographed image, not bare light, opaque film, or a fully exposed leader. Use the same exposure as the photo scans where possible.</p>
+<p>In Film Desk, select that RAW and click <b>Set blank reference</b>. It is excluded from export. Make a new reference when you change rolls, the lamp setting, or the diffuser. Known shutter, ISO, and aperture differences are normalized, but lamp changes cannot be inferred from camera metadata.</p>
+<h2>5. Capture one picture per RAW</h2>
+<p>This also applies to half-frame film. Fill as much of the sensor as practical with one complete image. Two half-frame pictures in one RAW are not split automatically. Review the crop in Film Desk, choose <b>Color</b> or <b>Black &amp; white</b>, and export JPEGs. Keep the original RAWs.</p>
+<p><small>Further reading: <a href="https://www.negativelabpro.com/guide/scanning/">camera-scanning setup guidance</a>, <a href="https://jackw01.github.io/scanlight/">why illumination spectra matter</a>, and <a href="https://helpguide.sony.net/ilc/2110/v1/en/contents/TP1000640844.html">Sony A7 IV ISO guide</a>. Film Desk's white-balance and reference behavior above describes this app's own processing.</small></p>
+</body></html>

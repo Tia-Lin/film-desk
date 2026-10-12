@@ -16,7 +16,8 @@ import numpy as np
 from PIL import Image
 from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QMessageBox
 from PySide6.QtCore import Qt
-from app import FilmDesk, STYLE, STOCKS, CUSTOM_STOCK
+from app import FilmDesk, STYLE
+from session_state import completion_matches
 
 
 @unittest.skipUnless(os.environ.get("FILMDESK_TEST_RAW"),"Set FILMDESK_TEST_RAW to run the real-RAW workflow")
@@ -52,9 +53,11 @@ class WorkflowTest(unittest.TestCase):
                 positive=window.last_pixels.copy()
                 self.assertIsNotNone(window.last_model)
                 self.assertGreater(positive.shape[1],800)
-                window.stock_combo.setCurrentText("Black & white");drain()
+                window.output_mode_combo.setCurrentText("Black & white");drain()
                 self.assertEqual(window.adjustments[window.current].color_mode,"Black & white")
-                self.assertTrue(all(a.film_stock=='Black & white' for a in window.adjustments.values()))
+                self.assertTrue(all(a.color_mode=='Black & white' for k,a in window.adjustments.items() if k!=window.reference_path))
+                self.assertFalse(window.mode_combo.isEnabled())
+                self.assertFalse(window.match_roll_button.isEnabled())
                 self.assertEqual(window.reference,original_reference)
                 self.assertFalse(window.sliders['saturation'].isEnabled())
                 self.assertFalse(window.neutral_button.isEnabled())
@@ -62,14 +65,21 @@ class WorkflowTest(unittest.TestCase):
                 np.testing.assert_array_equal(window.last_pixels[...,1],window.last_pixels[...,2])
                 window.undo();drain()
                 self.assertEqual(window.adjustments[window.current].color_mode,"Auto color")
-                with patch("app.QInputDialog.getText",return_value=("My indie color film",True)):
-                    window.stock_combo.setCurrentText(CUSTOM_STOCK)
-                drain()
-                self.assertEqual(window.adjustments[window.current].film_stock,"My indie color film")
-                self.assertTrue(all(a.film_stock=='My indie color film' for a in window.adjustments.values()))
+                np.testing.assert_array_equal(window.last_pixels,positive)
                 window.sliders["warmth"].set_value(.15);window.sliders_changed();drain()
-                window.save_stock_preset()
-                self.assertEqual(json.loads(window.presets_path.read_text())["My indie color film"]["warmth"],.15)
+                with patch("app.QInputDialog.getText",return_value=("Warm portraits",True)):
+                    window.save_preset()
+                self.assertEqual(json.loads(window.presets_path.read_text())["Warm portraits"]["warmth"],.15)
+                window.reset_current();drain()
+                with patch("app.QInputDialog.getItem",return_value=("Warm portraits",True)):
+                    window.load_preset()
+                drain()
+                self.assertEqual(window.adjustments[window.current].warmth,.15)
+                window.output_mode_combo.setCurrentText('Black & white');drain()
+                window.output_mode_combo.setCurrentText('Color');drain()
+                self.assertEqual(window.adjustments[window.current].color_mode,'Auto color')
+                self.assertEqual(window.reference,original_reference)
+                self.assertEqual(window.adjustments[window.current].warmth,.15)
                 current=window.current
                 window.apply_look();drain()
                 self.assertTrue(all(a.warmth==.15 for k,a in window.adjustments.items() if k!=window.reference_path))
@@ -96,20 +106,27 @@ class WorkflowTest(unittest.TestCase):
                     return QMessageBox.StandardButton.Ok
                 with patch.object(QDialog,"exec",accept_export),patch.object(QMessageBox,"exec",accept_summary):
                     window.start_export();drain()
+                    self.assertTrue(completion_matches(window.snapshot()))
                     self.assertEqual({p.name for p in destination.glob("*.jpg")},{"DSC02027.jpg","DSC02036.jpg"})
                     for p in destination.glob("*.jpg"):
                         with Image.open(p) as image:
                             self.assertGreater(image.width*image.height,10_000_000)
                             self.assertIn("icc_profile",image.info)
                     window.start_export();drain()
+                    self.assertTrue(completion_matches(window.snapshot()),'Verified skips must preserve completion')
                 self.assertIn("2 JPEGs exported",summaries[0])
                 self.assertIn("2 existing files skipped",summaries[1])
                 self.assertEqual(len(list(destination.glob("*.json"))),2)
                 self.assertEqual(len(list(destination.glob("*.filmdesk"))),2)
                 self.assertFalse((destination/"DSC02010.jpg").exists())
                 reopened=FilmDesk()
-                self.assertIn("My indie color film",reopened.presets)
-                self.assertEqual(len(STOCKS),9)
+                self.assertIn("Warm portraits",reopened.presets)
+                limit=time.monotonic()+3
+                while reopened.startup_timer.isActive():
+                    app.processEvents();time.sleep(.01)
+                    self.assertLess(time.monotonic(),limit)
+                self.assertIsNone(reopened.folder,'Completed export should start with a clean window')
+                self.assertEqual(reopened.recovery_button.text(),'Reopen last roll')
                 window.close();reopened.close()
                 app.processEvents()
 

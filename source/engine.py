@@ -19,7 +19,7 @@ import numpy as np
 import rawpy
 from PIL import Image, ImageCms, ImageFilter
 
-VERSION = "1.1.0"
+VERSION = "1.4.0"
 RAW_EXTENSIONS = {".arw", ".dng", ".nef", ".nrw", ".cr2", ".cr3", ".raf", ".orf", ".rw2", ".pef", ".srw", ".raw"}
 SRGB_PROFILE = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
 _CAMERA_MATRICES = {}
@@ -28,7 +28,7 @@ _MATRIX_LOCK = threading.Lock()
 
 @dataclass
 class Adjustments:
-    film_stock: str = "Kodak Portra 400"
+    film_stock: str = ""  # Legacy session metadata; never used for conversion.
     crop: list[float] = field(default_factory=lambda: [0., 0., 1., 1.])
     rotation: int = 0
     mirror: bool = False
@@ -317,6 +317,14 @@ def negative_preview(frame):
     return np.rint(encode_srgb(a/white)*255).astype(np.uint8)
 
 
+def neutral_sample_bounds(width, height, point):
+    """Pixel bounds of the picker patch in the oriented positive preview."""
+    x, y = int(point[0]*width), int(point[1]*height)
+    radius = max(3, round(min(height, width)*.008))
+    return (max(0,x-radius), max(0,y-radius),
+            min(width,x+radius+1), min(height,y+radius+1))
+
+
 def neutral_balance(frame, adjustments, reference, model, point):
     """Point is normalized in the displayed, cropped, rotated positive."""
     # Render the linear image once at preview resolution and orient identically.
@@ -330,9 +338,8 @@ def neutral_balance(frame, adjustments, reference, model, point):
     if neutral.rotation:
         a = np.rot90(a, -neutral.rotation)
     h, w = a.shape[:2]
-    x, y = int(point[0]*w), int(point[1]*h)
-    radius = max(3, round(min(h, w)*.008))
-    roi = a[max(0,y-radius):min(h,y+radius+1), max(0,x-radius):min(w,x+radius+1)]
+    x0, y0, x1, y1 = neutral_sample_bounds(w, h, point)
+    roi = a[y0:y1, x0:x1]
     values = np.median(roi, axis=(0,1))
     if np.any(values < .003) or np.max(values) > 1.3:
         raise ValueError("Choose a neutral midtone or light gray area, away from clipped highlights.")
