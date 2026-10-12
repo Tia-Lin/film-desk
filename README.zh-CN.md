@@ -1,10 +1,17 @@
 # Film Desk
 
-[English](README.md) · [相机支持](SUPPORTED_CAMERAS.zh-CN.md) · [下载](https://github.com/Tia-Lin/film-desk/releases/latest)
+[English](README.md) · [相机支持](SUPPORTED_CAMERAS.zh-CN.md) · [安装与首次打开](INSTALL.zh-CN.md) · [下载](https://github.com/Tia-Lin/film-desk/releases/latest)
 
 一款离线 Mac 应用，将相机翻拍的胶片负片转换为正片 JPEG。原始 RAW 文件不会被修改，照片不会上传。
 
-下载版适用于 Apple Silicon Mac，要求 macOS 26 或更高版本。将 Film Desk.app 复制到“应用程序”。更新时在原位置替换已有副本，避免出现两个应用。无需 Python、DaVinci Resolve 或网络连接。应用采用本地签名，尚未经过 Apple Developer ID 公证。
+下载版适用于 Apple Silicon Mac，要求 macOS 26 或更高版本。将 Film Desk.app 复制到“应用程序”。更新时在原位置替换已有副本，避免出现两个应用。无需 Python、DaVinci Resolve 或网络连接。应用采用本地签名，没有 Developer ID 签名，也尚未经过 Apple 公证。
+
+## 下载与首次打开
+
+- [GitHub 发布页](https://github.com/Tia-Lin/film-desk/releases/tag/v1.4.0)：安装包、校验文件及安装说明。
+- [百度网盘镜像](https://pan.baidu.com/s/15wbCfAXCBIA4cL81iml-Tg?pwd=2333)，提取码 **2333**：相同的 1.4.0 DMG、ZIP 和校验文件。平台可用性及下载要求可能变化。
+
+DMG 和 ZIP 二选一。安装包采用本地 ad hoc 签名，没有 Developer ID 签名和 Apple 公证。首次被 macOS 阻止时，按 [安装指引](INSTALL.zh-CN.md) 为此应用选择“仍要打开”。百度下载是否需要登录或客户端，取决于平台当前流程。
 
 ## 语言
 

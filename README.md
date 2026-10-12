@@ -1,10 +1,17 @@
 # Film Desk
 
-[简体中文](README.zh-CN.md) · [Supported cameras](SUPPORTED_CAMERAS.md) · [Download](https://github.com/Tia-Lin/film-desk/releases/latest)
+[简体中文](README.zh-CN.md) · [Supported cameras](SUPPORTED_CAMERAS.md) · [Installation and first launch](INSTALL.md) · [Download](https://github.com/Tia-Lin/film-desk/releases/latest)
 
 A simple, offline Mac app for turning camera-scanned film negatives into positive JPEGs.
 
 **Copy Film Desk.app into Applications.** Replace your existing copy in the same folder when updating. The downloadable Apple Silicon build requires macOS 26 or later. Sony A7 IV scans have been tested; other accepted RAW formats are described in [Supported cameras](SUPPORTED_CAMERAS.md). You do not need Python, Resolve, or an internet connection to use it.
+
+## Downloads and first launch
+
+- [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.4.0): DMG, ZIP, checksums, and installation instructions.
+- [Baidu Netdisk mirror](https://pan.baidu.com/s/15wbCfAXCBIA4cL81iml-Tg?pwd=2333), extraction code **2333**: the same 1.4.0 DMG, ZIP, and checksum file. Platform availability and download requirements can change.
+
+Choose DMG or ZIP. The build is locally ad hoc signed, without a Developer ID signature or Apple notarization. If macOS blocks the first launch, follow the [installation guide](INSTALL.md) for Apple's per-app Open Anyway procedure. Baidu sign-in or client requirements depend on its current download flow.
 
 ## Language
 
@@ -69,7 +76,7 @@ Keep the light uniform and RAW exposure unclipped. Use a new blank reference for
 
 ## Source and verification
 
-The source in `source/` is MIT licensed. Dependency licenses and source locations are in `licenses/` and `THIRD-PARTY-NOTICES.txt`. The app has no account, uploads, telemetry, subscription, or network calls. The downloadable build is locally signed, without paid Developer ID notarization.
+The source in `source/` is MIT licensed. Dependency licenses and source locations are in `licenses/` and `THIRD-PARTY-NOTICES.txt`. The app has no account, uploads, telemetry, subscription, or network calls. The downloadable build is locally signed, without a Developer ID signature or Apple notarization.
 
 Verification includes linear inversion, B&W output, exposure normalization, holder-edge exclusion, neutral balance, crop/orientation, avoiding overwrites, session persistence, legacy settings preservation, and keyboard-slider undo. A real-RAW workflow test also covers automatic thumbnails, color/grayscale selection, named adjustment persistence, reopening edits, full-size JPEG export, and skipping existing files. Other RAW extensions are accepted through LibRaw; real-camera verification used Sony A7 IV ARWs.
 
