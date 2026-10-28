@@ -92,6 +92,9 @@ class WorkflowTest(unittest.TestCase):
                 self.assertEqual(window.backlight_kelvin,5500)
                 window.write_recovery()
                 self.assertTrue((root/"data/last-session.filmdesk").exists())
+                window.flat_field_checkbox.setChecked(True);drain()
+                self.assertTrue(window.reference['flat_field_enabled'])
+                self.assertTrue(window.last_model['flat_field_applied'])
                 selected={"DSC02027.ARW","DSC02036.ARW"}
                 for k,a in window.adjustments.items():
                     a.included=Path(k).name in selected
@@ -112,6 +115,8 @@ class WorkflowTest(unittest.TestCase):
                         with Image.open(p) as image:
                             self.assertGreater(image.width*image.height,10_000_000)
                             self.assertIn("icc_profile",image.info)
+                    report=json.loads(next(destination.glob('*.json')).read_text())
+                    self.assertTrue(all(r['flat_field_applied'] for r in report['results']))
                     window.start_export();drain()
                     self.assertTrue(completion_matches(window.snapshot()),'Verified skips must preserve completion')
                 self.assertIn("2 JPEGs exported",summaries[0])

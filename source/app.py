@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 )
 from engine import (VERSION, RAW_EXTENSIONS, Adjustments, decode_raw, auto_crop,
     reference_from_frame, analyze, render, negative_preview, neutral_balance,
-    atomic_json, export_jpeg, clean_crop, neutral_sample_bounds)
+    atomic_json, export_jpeg, clean_crop, neutral_sample_bounds, validate_reference)
 from session_state import completion_matches, verified_existing_export, jpeg_digest, finished_export_snapshot
 
 from i18n import (tr as _t, label as _label, button as _push_button, action as _action,
@@ -446,7 +446,13 @@ class FilmDesk(QMainWindow):
         self.reference_label=_label('Blank reference needed\nSelect the unexposed frame first.')
         self.reference_label.setObjectName("hint");self.reference_label.setWordWrap(True);left_layout.addWidget(self.reference_label)
         self.reference_button=self.button("Set blank reference",self.use_current_reference,tip="Use the selected unexposed frame to measure the film's base color. It will be excluded from export.")
-        left_layout.addWidget(self.reference_button);self.split.addWidget(left)
+        left_layout.addWidget(self.reference_button)
+        self.flat_field_checkbox=_checkbox('Correct uneven lighting')
+        self.flat_field_checkbox.toggled.connect(self.toggle_flat_field)
+        left_layout.addWidget(self.flat_field_checkbox)
+        self.flat_field_note=_label('');self.flat_field_note.setWordWrap(True)
+        self.flat_field_note.setObjectName('muted');left_layout.addWidget(self.flat_field_note)
+        self.split.addWidget(left)
 
         middle=QWidget();middle_layout=QVBoxLayout(middle);middle_layout.setContentsMargins(10,0,10,0)
         self.photo_title=_label('Welcome');self.photo_title.setObjectName("title");middle_layout.addWidget(self.photo_title)
@@ -572,6 +578,15 @@ class FilmDesk(QMainWindow):
         else:
             _set_text(self.reference_label, 'Blank reference needed\nSelect the unexposed frame first.')
         self.reference_button.setVisible(bool(self.folder) and not bool(self.reference))
+        self.flat_field_checkbox.blockSignals(True)
+        self.flat_field_checkbox.setChecked(bool(self.reference and self.reference.get('flat_field_enabled')))
+        self.flat_field_checkbox.blockSignals(False)
+        self.flat_field_checkbox.setVisible(bool(self.reference))
+        error=self.reference.get('flat_field_error','') if self.reference else ''
+        self.flat_field_checkbox.setEnabled(bool(self.reference) and not error and not self.job_running)
+        _set_tip(self.flat_field_checkbox, 'Use a smooth map of the blank frame to correct broad brightness and color unevenness across the roll. Keep the same light, camera position, lens and aperture. Off preserves the original conversion.')
+        _set_text(self.flat_field_note,error)
+        self.flat_field_note.setVisible(bool(error))
 
     def refresh_tool_labels(self):
         _set_text(self.original_button, 'Show positive' if self.original_button.isChecked() else 'Show negative')
@@ -851,6 +866,8 @@ class FilmDesk(QMainWindow):
             warnings.append("Camera color transform could not be verified. Inspect the positive colors before exporting.")
         if self.last_model and self.last_model.get("warning"):
             warnings.append(self.last_model["warning"])
+        if self.last_model and self.last_model.get("flat_field_warning"):
+            warnings.append(self.last_model["flat_field_warning"])
         _set_text(self.warning_label, '\n'.join(warnings));self.warning_label.setVisible(bool(warnings))
         self.update_enabled()
         if not self.job_running:
@@ -986,8 +1003,14 @@ class FilmDesk(QMainWindow):
         self.mark_dirty()
         if self.current==self.reference_path and self.current in self.cache:
             try:
+                enabled=bool(self.reference and self.reference.get('flat_field_enabled'))
                 self.reference=reference_from_frame(self.cache[self.current],crop)
+                self.reference['flat_field_enabled']=enabled and bool(self.reference.get('flat_field'))
+                self.roll_model=None
+                for a in self.adjustments.values():
+                    if a.color_mode=='Roll color':a.color_mode='Auto color'
                 self.models.clear()
+                self.thumbnail_timer.start()
                 self.status('Film-base sample updated from the new crop.')
             except ValueError as exc:
                 self.show_error(str(exc))
@@ -1043,24 +1066,52 @@ class FilmDesk(QMainWindow):
         if self.current:
             self.set_reference(self.current)
 
-    def set_reference(self,path):
+    def toggle_flat_field(self,enabled):
+        if self.job_running or not self.reference:
+            self.refresh_reference_label();return
+        if enabled and not self.reference.get('flat_field'):
+            # Old sessions keep their original recipe until explicitly enabled.
+            self.refresh_reference_label()
+            if self.reference_path:
+                self.set_reference(self.reference_path,enable_flat_field=True)
+            return
+        self.checkpoint()
+        self.reference['flat_field_enabled']=bool(enabled)
+        self.roll_model=None;self.models.clear()
+        for a in self.adjustments.values():
+            if a.color_mode=='Roll color':a.color_mode='Auto color'
+        self.load_controls();self.mark_dirty();self.update_enabled();self.request_preview()
+        self.thumbnail_timer.start()
+        self.status('Uneven-light correction enabled for the roll.' if enabled else 'Uneven-light correction turned off.')
+
+    def set_reference(self,path,*,enable_flat_field=False):
         if self.job_running:
             return
         path=str(Path(path).resolve())
-        self.status('Measuring the unexposed film base…')
+        self.set_busy(True,'Measuring the unexposed film base…')
         generation=self.folder_generation
         frame=self.cache.get(path)
         crop=self.adjustments[path].crop if path in self.adjustments and path not in self.pending_crops else None
+        if enable_flat_field and path==self.reference_path:
+            crop=self.reference.get('crop',crop)
         def work(progress):
             decoded=frame or decode_raw(path)
             return decoded,reference_from_frame(decoded,crop)
         def done(result):
+            self.set_busy(False)
             if generation!=self.folder_generation:
                 return
-            self.checkpoint()
             decoded,reference=result
+            if enable_flat_field and not reference.get('flat_field'):
+                self.refresh_reference_label()
+                self.show_error(reference.get('flat_field_error','Set the blank reference again.'))
+                return
+            self.checkpoint()
+            reference['flat_field_enabled']=enable_flat_field
             previous=self.reference_path
             self.reference_path=path;self.reference=reference;self.roll_model=None;self.models.clear()
+            for a in self.adjustments.values():
+                if a.color_mode=='Roll color':a.color_mode='Auto color'
             self.cache_put(path,decoded)
             if previous in self.adjustments and previous!=path:
                 self.adjustments[previous].included=True
@@ -1072,8 +1123,9 @@ class FilmDesk(QMainWindow):
             _plain_tip(self.reference_label, path)
             if reference["uneven"]:
                 self.status('Reference is uneven. Check that its crop contains only clear, unexposed film.')
-            self.mark_dirty();self.update_enabled();self.request_preview()
-        self.submit(work,done)
+            self.load_controls();self.mark_dirty();self.update_enabled();self.request_preview()
+            self.thumbnail_timer.start()
+        self.submit(work,done,lambda error:(self.set_busy(False),self.show_error(error)))
 
     def clear_reference(self):
         if self.job_running:
@@ -1082,8 +1134,11 @@ class FilmDesk(QMainWindow):
         if self.reference_path in self.adjustments:
             self.adjustments[self.reference_path].included=True
         self.reference_path=None;self.reference=None;self.roll_model=None;self.models.clear()
+        for a in self.adjustments.values():
+            if a.color_mode=='Roll color':a.color_mode='Auto color'
         self.refresh_reference_label()
-        self.sync_checks();self.mark_dirty();self.update_enabled();self.request_preview()
+        self.sync_checks();self.load_controls();self.mark_dirty();self.update_enabled();self.request_preview()
+        self.thumbnail_timer.start()
 
     def sync_checks(self):
         self.list.blockSignals(True)
@@ -1345,13 +1400,16 @@ class FilmDesk(QMainWindow):
                 text+="\nExport stopped after the current image."
             if errors:
                 text+=f"\n{len(errors)} files could not be converted.\n"+"\n".join(Path(r["source"]).name+": "+r["reason"] for r in errors[:5])
+            field_warnings=[r for r in results if r.get('flat_field_warning')]
+            if field_warnings:
+                text+='\n'+_t('Uneven-light correction was not applied to {p0} exported photos. See the export report for filenames and reasons.',p0=len(field_warnings))
             if any(r['status']=='skipped' and not r.get('verified') for r in results):
                 text+="\nSkipped JPEGs were not confirmed to match these edits. Choose a new folder to export the current version."
             if self.completed_export:
                 text+="\nThis roll is finished. Next launch will be ready for a new roll; your edits remain available."
             text+=f"\n\nSaved in:\n{destination}\n\nOriginal RAW filenames were preserved."
             message=QMessageBox(self);_set_title(message, 'Export finished');_set_text(message, text)
-            message.setIcon(QMessageBox.Icon.Warning if errors else QMessageBox.Icon.Information)
+            message.setIcon(QMessageBox.Icon.Warning if errors or field_warnings else QMessageBox.Icon.Information)
             reveal=message.addButton("Show folder",QMessageBox.ButtonRole.ActionRole)
             message.addButton(QMessageBox.StandardButton.Ok);message.exec()
             if message.clickedButton()==reveal:
@@ -1438,10 +1496,7 @@ class FilmDesk(QMainWindow):
             for a in data.get("photos",{}).values():
                 Adjustments.from_dict(a)
             if data.get("reference"):
-                base=np.asarray(data["reference"]["base"],dtype=float)
-                if base.shape!=(3,) or not np.all(np.isfinite(base)) or np.any(base<=0):
-                    raise ValueError("Invalid film-base reference in session")
-                clean_crop(data["reference"].get("crop",[0,0,1,1]))
+                validate_reference(data['reference'])
             if data.get("roll_model"):
                 low=np.asarray(data["roll_model"]["low"],dtype=float)
                 high=np.asarray(data["roll_model"]["high"],dtype=float)
@@ -1461,12 +1516,16 @@ class FilmDesk(QMainWindow):
     def undo(self):
         if self.job_running or not self.undo_stack:
             return
+        before=copy.deepcopy(self.reference)
         self.redo_stack.append(self.snapshot());self.restore_snapshot(self.undo_stack.pop());self.request_preview()
+        if self.reference!=before:self.thumbnail_timer.start()
 
     def redo(self):
         if self.job_running or not self.redo_stack:
             return
+        before=copy.deepcopy(self.reference)
         self.undo_stack.append(self.snapshot());self.restore_snapshot(self.redo_stack.pop());self.request_preview()
+        if self.reference!=before:self.thumbnail_timer.start()
 
     def show_help(self):
         QMessageBox.information(self, _t('Using Film Desk'), _t("1. Open folder: choose your camera RAW scans. Photo previews are prepared automatically.\n\n2. Select the blank, unexposed frame and click Set blank reference. It is excluded from export.\n\n3. Choose Color or Black & white for this roll. Start with the automatic result, then adjust each photo's brightness, contrast, color intensity, or warmth as needed.\n\n4. Balance colors: click a known white or gray object in the photo. Crop photo: drag around one film image, then click Done cropping. Rotate 90° turns the photo clockwise.\n\n5. Apply adjustments to roll copies the color and brightness settings to the other photos, keeping their individual crops. Undo: ⌘Z.\n\n6. Export JPEGs: check the destination, then export. Original filenames and full cropped resolution are retained. Existing JPEGs are skipped, so choose a new folder for revised versions.\n\nUnfinished work reopens on launch. After a confirmed export of every selected photo, the next launch starts fresh; Reopen last roll restores your edits if needed. Editing after export makes the roll unfinished again. Canceled or failed exports keep your work ready to resume. File → Save edits saves a named session; File → Open saved edits reopens it. Original RAWs are never changed.\n\nAdvanced contains optional roll matching, extra tone controls, flipping, saved adjustments, and reference replacement. Save adjustments lets you name tuning for later; Load saved adjustments applies it to the current photo.\n\nHelp → How to photograph film covers scanning light, camera settings, white balance, and the blank reference."))
@@ -1563,6 +1622,7 @@ def main():
     parser.add_argument("--session")
     parser.add_argument("--check-report",help=argparse.SUPPRESS)
     parser.add_argument("--check-raw",help=argparse.SUPPRESS)
+    parser.add_argument("--check-reference",help=argparse.SUPPRESS)
     args=parser.parse_args()
     if args.input and not(args.folder or args.session):
         path=Path(args.input)
@@ -1578,7 +1638,13 @@ def main():
         if args.check_raw:
             f=decode_raw(args.check_raw)
             a=Adjustments(crop=auto_crop(f))
-            pixels,model=render(f,a)
+            reference=None
+            if args.check_reference:
+                reference=reference_from_frame(decode_raw(args.check_reference))
+                if not reference.get('flat_field'):
+                    raise ValueError(reference.get('flat_field_error','Invalid blank reference'))
+                reference['flat_field_enabled']=True
+            pixels,model=render(f,a,reference)
             report["RAW"]={"source":str(args.check_raw),"preview_size":[pixels.shape[1],pixels.shape[0]],
                            "metadata":f.metadata,"analysis":model}
         atomic_json(args.check_report,report)

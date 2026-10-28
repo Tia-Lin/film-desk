@@ -2,11 +2,11 @@
 
 [English](INSTALL.md) · [项目说明](README.zh-CN.md)
 
-适用于 Film Desk 1.4.0 的 Apple Silicon（M 系列）Mac 安装包，要求 macOS 26 或更高版本。Intel Mac 和 Windows 不能运行此安装包。
+适用于 Film Desk 1.5.0 的 Apple Silicon（M 系列）Mac 安装包，要求 macOS 26 或更高版本。Intel Mac 和 Windows 不能运行此安装包。
 
 ## 下载和安装
 
-从 [GitHub 发布页](https://github.com/Tia-Lin/film-desk/releases/tag/v1.4.0) 或 README 中的百度镜像下载。DMG 和 ZIP 二选一即可。
+从 [GitHub 发布页](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.0) 下载本版本。README 中的百度镜像目前仍为 1.4.0。DMG 和 ZIP 二选一即可。
 
 1. DMG：双击打开，将 Film Desk.app 复制到“应用程序”，然后推出磁盘映像。
 2. ZIP：解压后将 Film Desk.app 复制到“应用程序”。
@@ -35,22 +35,10 @@
 打开“终端”，输入以下命令（路径适用于默认“下载”文件夹；若下载位置不同，请修改路径）：
 
 ```sh
-shasum -a 256 "$HOME/Downloads/Film-Desk-1.4.0-macOS-arm64.dmg"
+shasum -a 256 "$HOME/Downloads/Film-Desk-1.5.0-macOS-arm64.dmg"
 ```
 
-DMG 应为：
-
-```text
-5c0109ce16c7270194c812ea1df49e1745d2af39142d5a3e26240d0d8de6edc1
-```
-
-ZIP 应为：
-
-```text
-0b87b65a7ae19e440105799bb28a9965093f8cae2e185ec6c98f3ee7e3f8dc61
-```
-
-检查 ZIP 时将命令中的 `.dmg` 改为 `.zip`。也可对照发布页的 SHA256SUMS 文件。校验值一致说明文件字节与发布包相同，不等于 Apple 安全认证；不同则不要打开。
+将结果与发布页 `Film-Desk-1.5.0-SHA256SUMS.txt` 中相同文件名的校验值比较。检查 ZIP 时将命令中的 `.dmg` 改为 `.zip`。校验值一致说明文件字节与发布包相同，不等于 Apple 安全认证；不同则不要打开。
 
 ## 照片文件夹权限
 

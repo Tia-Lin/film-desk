@@ -8,8 +8,8 @@ A simple, offline Mac app for turning camera-scanned film negatives into positiv
 
 ## Downloads and first launch
 
-- [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.4.0): DMG, ZIP, checksums, and installation instructions.
-- [Baidu Netdisk mirror](https://pan.baidu.com/s/15wbCfAXCBIA4cL81iml-Tg?pwd=2333), extraction code **2333**: the same 1.4.0 DMG, ZIP, and checksum file. Platform availability and download requirements can change.
+- [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.0): DMG, ZIP, checksums, and installation instructions.
+- [Baidu Netdisk mirror](https://pan.baidu.com/s/15wbCfAXCBIA4cL81iml-Tg?pwd=2333), extraction code **2333**: the older 1.4.0 DMG, ZIP, and checksum file; it does not include uneven-light correction. Use GitHub for 1.5.0. Platform availability and download requirements can change.
 
 Choose DMG or ZIP. The build is locally ad hoc signed, without a Developer ID signature or Apple notarization. If macOS blocks the first launch, follow the [installation guide](INSTALL.md) for Apple's per-app Open Anyway procedure. Baidu sign-in or client requirements depend on its current download flow.
 
@@ -51,11 +51,21 @@ Open **Help → How to photograph film…** for the complete guide, including li
 
 For example, with a Sony A7 IV, a starting setup is RAW, manual exposure, ISO 100, f/8, manual focus, and a fixed 5500 K scanning light. Change shutter speed to get enough signal without clipping clear film in any channel; there is no required shutter speed. Keep the film flat, the camera parallel, and the illumination evenly diffused.
 
-Camera white balance affects the camera preview/JPEG, but Film Desk does not apply it to camera RAW decoding. A fixed 5500 K camera setting is useful for consistent previews. The lamp's actual spectrum and uniformity still matter; identical Kelvin labels do not guarantee identical scan colors. The blank reference measures film-base color, not a spatial flat-field or complete spectral calibration.
+Camera white balance affects the camera preview/JPEG, but Film Desk does not apply it to camera RAW decoding. A fixed 5500 K camera setting is useful for consistent previews. The lamp's actual spectrum and uniformity still matter; identical Kelvin labels do not guarantee identical scan colors. The blank reference measures film-base color. Optional uneven-light correction also measures a smooth spatial map; neither provides a complete spectral calibration.
 
 Capture a clear, unexposed but developed piece of the same roll through the same holder and diffuser, preferably at the same exposure. Use a new reference when the roll or light setup changes. Capture one picture per RAW, including half-frame film; the app does not split two pictures automatically.
 
 Further reading: [camera-scanning setup](https://www.negativelabpro.com/guide/scanning/), [illumination spectra](https://jackw01.github.io/scanlight/), and [Sony A7 IV ISO](https://helpguide.sony.net/ilc/2110/v1/en/contents/TP1000640844.html). Film Desk's RAW behavior is defined by its own conversion engine.
+
+## Correct uneven lighting
+
+After setting a blank reference, optionally enable **Correct uneven lighting** beneath it. This roll-wide setting compensates for broad backlight brightness/color gradients and lens shading before negative inversion. It starts off, so existing edits retain their original conversion. Older references are measured again from their RAW only when you enable the feature.
+
+The reference must show clear, developed but unexposed film across the photo area. Keep the camera position, lens, magnification, focus, aperture, holder, diffuser, and light settings fixed. Rephotograph the reference after changing the setup. A small clear patch can establish film-base color but cannot calibrate a whole picture. Crop out opaque holder edges, sprockets, photographed content, and development stains. The app smooths broad variation rather than copying dust, grain, or scratches into other photos; it is not dust removal or a correction for scene lighting.
+
+Calibration uses fixed capture coordinates, so cropping, rotation, and mirroring do not stretch the lighting map. Preview, neutral sampling, and full-resolution JPEG export use the same map. Clipped, dark, very small, or strongly irregular references cannot enable correction. Photos with different recorded sensor dimensions/aperture or crops outside the calibrated area use ordinary conversion and show a warning; the export summary and report identify such exports. Changes in lamp output or camera position cannot be detected reliably from metadata.
+
+The setting and calibration are saved with your edits and support undo/redo. Changing correction clears the previous matched roll response; match the roll again if needed. Export revised photos to a new folder because existing JPEGs are skipped. Turn the checkbox off to compare the original conversion.
 
 ## Exposure feedback
 
@@ -72,7 +82,7 @@ The **Advanced** section starts closed. It contains optional controls:
 - **Save adjustments… / Load saved adjustments…** — name real tuning and apply it to the current photo in a future session. Use Apply adjustments to roll to copy it to the other photos. Saved tuning from older versions remains available; a saved name identifies actual adjustments, not a measured film profile. Crops, orientation, and sampled neutral balance are not included.
 - **Blank reference** — choose an external blank frame, replace the reference, or remove it.
 
-Keep the light uniform and RAW exposure unclipped. Use a new blank reference for a different roll or light spectrum/intensity. Capture exposure differences are normalized using shutter/ISO/aperture metadata, but the app cannot measure a backlight change or remove uneven illumination. Partial frames and damaged film ends can need a manual crop. Dust, scratches, and grain are retained; missing image content is not reconstructed. Keep the RAW files for future reinterpretation.
+Keep the light uniform and RAW exposure unclipped. Use a new blank reference for a different roll or light spectrum/intensity. Capture exposure differences are normalized using shutter/ISO/aperture metadata, but the app cannot infer a backlight change; use optional uneven-light correction only with a matching reference. Partial frames and damaged film ends can need a manual crop. Dust, scratches, and grain are retained; missing image content is not reconstructed. Keep the RAW files for future reinterpretation.
 
 ## Source and verification
 

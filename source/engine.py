@@ -19,7 +19,7 @@ import numpy as np
 import rawpy
 from PIL import Image, ImageCms, ImageFilter
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 RAW_EXTENSIONS = {".arw", ".dng", ".nef", ".nrw", ".cr2", ".cr3", ".raf", ".orf", ".rw2", ".pef", ".srw", ".raw"}
 SRGB_PROFILE = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
 _CAMERA_MATRICES = {}
@@ -103,6 +103,7 @@ def decode_raw(path, preview=True, max_side=1500):
             "shutter": float(other.shutter_speed), "aperture": float(other.aperture),
             "sensor_clip_percent": clip_percent,
             "white_level": int(raw.white_level),
+            "raw_size": [int(scan.shape[1]), int(scan.shape[0])],
         }
         # adjust_maximum_thr=0 prevents per-image maximum rescaling. Unity WB
         # prevents the usual daylight coefficients from silently being applied.
@@ -197,7 +198,8 @@ def auto_crop(frame):
 
 
 def reference_from_frame(frame, crop=None):
-    crop = crop or auto_crop(frame)
+    automatic = auto_crop(frame)
+    crop = crop or automatic
     a = crop_pixels(frame.pixels, crop).astype(np.float32)
     if frame.pixels.dtype == np.uint16:
         a /= 65535.
@@ -209,8 +211,150 @@ def reference_from_frame(frame, crop=None):
         raise ValueError("Film reference is too dark. Crop to the clear, unexposed film.")
     spread = np.percentile(roi.reshape(-1, 3), 90, axis=0) / np.maximum(
         np.percentile(roi.reshape(-1, 3), 10, axis=0), 1e-6)
-    return {"base": base.tolist(), "metadata": frame.metadata, "crop": crop,
-            "uneven": bool(np.max(spread) > 1.35)}
+    reference = {"base": base.tolist(), "metadata": frame.metadata, "crop": crop,
+                 "uneven": bool(np.max(spread) > 1.35), "flat_field_enabled": False}
+    candidates = [crop]
+    if np.allclose(crop, automatic, atol=1/max(frame.pixels.shape[:2]), rtol=0):
+        # auto_crop reserves 5% inside the opening for photo statistics. A blank
+        # can calibrate almost the whole clear opening: retain a 1% edge margin.
+        x0, y0, x1, y1 = crop
+        for fraction in [.044, .033, .022, .011][::-1]:
+            candidates.insert(0, clean_crop([x0-(x1-x0)*fraction, y0-(y1-y0)*fraction,
+                                              x1+(x1-x0)*fraction, y1+(y1-y0)*fraction]))
+    for field_crop in candidates:
+        try:
+            reference["flat_field"] = measure_flat_field(frame, field_crop, base)
+            reference.pop("flat_field_error", None)
+            break
+        except ValueError as exc:
+            # An unsuitable spatial reference can still supply the base color.
+            reference["flat_field_error"] = str(exc)
+    return reference
+
+
+# A low-order surface models broad illumination, rather than copying reference
+# grain, scratches, dust, or individual pixels into every photograph.
+_FIELD_POWERS = tuple((x, degree-x) for degree in range(5) for x in range(degree+1))
+
+
+def _field_basis(x, y):
+    return np.stack([x**i*y**j for i, j in _FIELD_POWERS], axis=-1)
+
+
+def measure_flat_field(frame, crop, base):
+    a = crop_pixels(frame.pixels, crop).astype(np.float32)
+    if frame.pixels.dtype == np.uint16:
+        a /= 65535.
+    h, w = a.shape[:2]
+    if min(h, w) < 64:
+        raise ValueError("The blank reference is too small for uneven-light correction.")
+    if not np.all(np.isfinite(a)):
+        raise ValueError("The blank reference contains invalid pixel values.")
+    if np.max(np.mean(a >= .995, axis=(0, 1))) > .001:
+        raise ValueError("The blank reference is clipped. Reduce scan exposure and photograph it again.")
+    nx, ny = min(21, w//8), min(21, h//8)
+    xs, ys = np.linspace(0, w, nx+1).astype(int), np.linspace(0, h, ny+1).astype(int)
+    samples, coordinates = [], []
+    for y0, y1 in zip(ys[:-1], ys[1:]):
+        for x0, x1 in zip(xs[:-1], xs[1:]):
+            samples.append(np.median(a[y0:y1, x0:x1], axis=(0, 1)))
+            coordinates.append([(x0+x1)/w-1, (y0+y1)/h-1])
+    samples = np.asarray(samples)
+    if np.any(samples < .0005):
+        raise ValueError("The blank reference has dark or blocked areas. Crop to clear film covering the photo area.")
+    if np.max(np.max(samples, axis=0)/np.min(samples, axis=0)) > 4:
+        raise ValueError("The blank reference varies too strongly. Check the holder, film, and backlight.")
+    coordinates = np.asarray(coordinates)
+    design = _field_basis(coordinates[:, 0], coordinates[:, 1])
+    signal = np.log(samples/np.asarray(base))
+    weights = np.ones(len(samples))
+    for _ in range(6):
+        weighted = np.sqrt(weights)[:, None]
+        coefficients, _, rank, _ = np.linalg.lstsq(design*weighted, signal*weighted, rcond=None)
+        residual = np.max(np.abs(signal-design@coefficients), axis=1)
+        weights = np.minimum(1, .025/np.maximum(residual, 1e-6))
+    if rank != len(_FIELD_POWERS) or np.percentile(residual, 90) > .12:
+        raise ValueError("The blank reference has too much detail or staining for a smooth lighting correction.")
+    # Store the actual sampled bounds in full, unrotated image coordinates.
+    full_h, full_w = frame.pixels.shape[:2]
+    x0, y0, x1, y1 = clean_crop(crop)
+    bounds = [round(x0*full_w)/full_w, round(y0*full_h)/full_h,
+              round(x1*full_w)/full_w, round(y1*full_h)/full_h]
+    model = {"schema": 1, "coefficients": coefficients.tolist(), "crop": bounds,
+             "aspect": full_w/full_h, "raw_size": frame.metadata.get("raw_size")}
+    # Reject a polynomial that extrapolates wildly between the measured tiles.
+    x, y = np.meshgrid(np.linspace(-1, 1, 33), np.linspace(-1, 1, 33))
+    fitted = _field_basis(x, y)@coefficients
+    if np.any(np.abs(fitted) > np.log(4)):
+        raise ValueError("The blank reference varies too strongly. Check the holder, film, and backlight.")
+    return model
+
+
+def validate_reference(reference):
+    """Validate saved spatial calibration before it replaces an active session."""
+    base = np.asarray(reference["base"], dtype=float)
+    if base.shape != (3,) or not np.all(np.isfinite(base)) or np.any(base <= 0):
+        raise ValueError("Invalid film-base reference in session")
+    clean_crop(reference.get("crop", [0, 0, 1, 1]))
+    if not isinstance(reference.get("flat_field_enabled", False), bool):
+        raise ValueError("Invalid uneven-light correction in session")
+    model = reference.get("flat_field")
+    if model is None:
+        if reference.get("flat_field_enabled"):
+            raise ValueError("The saved uneven-light correction has no calibration. Set the blank reference again.")
+        return
+    c = np.asarray(model["coefficients"], dtype=float)
+    aspect = float(model["aspect"])
+    if (model.get("schema") != 1 or c.shape != (len(_FIELD_POWERS), 3)
+            or not np.all(np.isfinite(c)) or np.max(np.abs(c)) > 10
+            or not math.isfinite(aspect) or not .1 < aspect < 10):
+        raise ValueError("Invalid uneven-light calibration in session")
+    clean_crop(model["crop"])
+    raw_size = model.get("raw_size")
+    if raw_size is not None and (not isinstance(raw_size, list) or len(raw_size) != 2
+            or any(not isinstance(n, int) or n <= 0 for n in raw_size)):
+        raise ValueError("Invalid reference sensor size in session")
+
+
+def flat_field_for_frame(frame, crop, reference):
+    """A spatial map belongs to fixed capture coordinates, never the photo crop."""
+    if not reference or not reference.get("flat_field_enabled", False):
+        return None, ""
+    validate_reference(reference)
+    model = reference["flat_field"]
+    h, w = frame.pixels.shape[:2]
+    raw_size = model.get("raw_size")
+    if ((raw_size and frame.metadata.get("raw_size") != raw_size)
+            or abs((w/h)/model["aspect"]-1) > .003):
+        return None, "Uneven-light correction skipped: the scan dimensions differ from the blank reference."
+    ref_aperture = reference.get("metadata", {}).get("aperture", 0)
+    aperture = frame.metadata.get("aperture", 0)
+    if min(ref_aperture, aperture) > 0 and abs(math.log2(aperture/ref_aperture)) > .03:
+        return None, "Uneven-light correction skipped: use a reference photographed at the same aperture."
+    c, r = clean_crop(crop), model["crop"]
+    # Allow a few preview pixels of rounding/holder-edge detection difference.
+    tolerance = .003
+    if c[0] < r[0]-tolerance or c[1] < r[1]-tolerance or c[2] > r[2]+tolerance or c[3] > r[3]+tolerance:
+        return None, "Uneven-light correction skipped: crop this photo inside the area covered by the blank reference."
+    return model, ""
+
+
+def spatial_density_offset(frame, crop, model, start=0, stop=None):
+    """Evaluate a bounded row strip at original sensor positions, before rotation."""
+    if model is None:
+        return None
+    h, w = frame.pixels.shape[:2]
+    x0, y0, x1, y1 = clean_crop(crop)
+    left, top, right, bottom = round(x0*w), round(y0*h), round(x1*w), round(y1*h)
+    stop = bottom-top if stop is None else min(stop, bottom-top)
+    r = model["crop"]
+    x = (((np.arange(left, right, dtype=np.float32)+.5)/w-r[0])/(r[2]-r[0])*2-1)[None, :]
+    y = (((np.arange(top+start, top+stop, dtype=np.float32)+.5)/h-r[1])/(r[3]-r[1])*2-1)[:, None]
+    result = np.zeros((stop-start, right-left, 3), dtype=np.float32)
+    for (i, j), coefficients in zip(_FIELD_POWERS, model["coefficients"]):
+        result += ((x**i)*(y**j))[..., None]*np.asarray(coefficients, dtype=np.float32)
+    # A malformed saved surface must never amplify arbitrarily.
+    return np.clip(result, -np.log(4), np.log(4))
 
 
 def exposure_scale(metadata, reference):
@@ -225,7 +369,7 @@ def exposure_scale(metadata, reference):
     return current/ref if ref > 0 and current > 0 else 1.
 
 
-def density(pixels, metadata, reference):
+def density(pixels, metadata, reference, spatial_offset=None):
     a = pixels.astype(np.float32)
     if pixels.dtype == np.uint16:
         a /= 65535.
@@ -235,11 +379,14 @@ def density(pixels, metadata, reference):
         # Used only when no film-base reference exists. Automatic per-channel
         # endpoint alignment removes the resulting constant density offset.
         base = np.ones(3, dtype=np.float32)
-    return np.log(np.maximum(base, 1e-6) / np.maximum(a, 1/65535.))
+    result = np.log(np.maximum(base, 1e-6) / np.maximum(a, 1/65535.))
+    return result if spatial_offset is None else result+spatial_offset
 
 
 def analyze(frame, adjustments, reference=None, roll_model=None):
-    d = density(crop_pixels(frame.pixels, adjustments.crop), frame.metadata, reference)
+    field, field_warning = flat_field_for_frame(frame, adjustments.crop, reference)
+    d = density(crop_pixels(frame.pixels, adjustments.crop), frame.metadata, reference,
+                spatial_density_offset(frame, adjustments.crop, field))
     # Holder lips and uneven film borders can survive an automatic crop. Use
     # an inner analysis area without throwing away those pixels on export.
     # This keeps a narrow dark border from setting the color endpoints.
@@ -255,12 +402,13 @@ def analyze(frame, adjustments, reference=None, roll_model=None):
         high = np.array(roll_model["high"], dtype=np.float32)
     span = np.maximum(high-low, .12)
     return {"low": low.tolist(), "high": (low+span).tolist(),
+            "flat_field_applied": field is not None, "flat_field_warning": field_warning,
             "warning": "Low-density range; check the crop or film-base reference."
             if np.any(high-low < .12) else ""}
 
 
-def _linear_positive(pixels, metadata, adjustments, reference, model):
-    d = density(pixels, metadata, reference)
+def _linear_positive(pixels, metadata, adjustments, reference, model, spatial_offset=None):
+    d = density(pixels, metadata, reference, spatial_offset)
     low = np.asarray(model["low"], dtype=np.float32)
     span = np.maximum(np.asarray(model["high"], dtype=np.float32)-low, .12)
     v = np.clip((d-low)/span, -.2, 1.5)
@@ -295,11 +443,14 @@ def encode_srgb(linear):
 
 
 def render(frame, adjustments, reference=None, model=None, roll_model=None, orient=True):
-    model = model or analyze(frame, adjustments, reference, roll_model)
+    model = dict(model or analyze(frame, adjustments, reference, roll_model))
+    field, warning = flat_field_for_frame(frame, adjustments.crop, reference)
+    model.update(flat_field_applied=field is not None, flat_field_warning=warning)
     a = crop_pixels(frame.pixels, adjustments.crop)
     out = np.empty(a.shape, dtype=np.uint8)
     for start in range(0, len(a), 192):
-        linear = _linear_positive(a[start:start+192], frame.metadata, adjustments, reference, model)
+        offset = spatial_density_offset(frame, adjustments.crop, field, start, start+192)
+        linear = _linear_positive(a[start:start+192], frame.metadata, adjustments, reference, model, offset)
         out[start:start+192] = np.rint(encode_srgb(linear)*255).astype(np.uint8)
     if orient:
         if adjustments.mirror:
@@ -332,7 +483,9 @@ def neutral_balance(frame, adjustments, reference, model, point):
     neutral = Adjustments.from_dict(asdict(adjustments))
     neutral.neutral_gains = [1., 1., 1.]
     neutral.warmth = neutral.tint = 0.
-    a = _linear_positive(crop, frame.metadata, neutral, reference, model)
+    field, _ = flat_field_for_frame(frame, adjustments.crop, reference)
+    a = _linear_positive(crop, frame.metadata, neutral, reference, model,
+                         spatial_density_offset(frame, adjustments.crop, field))
     if neutral.mirror:
         a = a[:, ::-1]
     if neutral.rotation:
@@ -368,7 +521,7 @@ def export_jpeg(source, destination, adjustments, reference, model, quality=95):
                 "reason": "File already exists"}
     destination.parent.mkdir(parents=True, exist_ok=True)
     full = decode_raw(source, preview=False)
-    pixels, _ = render(full, adjustments, reference, model=model)
+    pixels, rendered_model = render(full, adjustments, reference, model=model)
     fd, temporary = tempfile.mkstemp(prefix=".film-desk-", suffix=".jpg", dir=destination.parent)
     try:
         os.close(fd)
@@ -398,6 +551,8 @@ def export_jpeg(source, destination, adjustments, reference, model, quality=95):
                     destination.unlink(missing_ok=True)
                 raise
         return {"status": "exported", "source": str(source), "destination": str(destination),
+                "flat_field_applied": rendered_model["flat_field_applied"],
+                "flat_field_warning": rendered_model["flat_field_warning"],
                 "size": [pixels.shape[1], pixels.shape[0]], "profile": "sRGB", "quality": quality}
     finally:
         Path(temporary).unlink(missing_ok=True)

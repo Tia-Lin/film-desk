@@ -2,11 +2,11 @@
 
 [简体中文](INSTALL.zh-CN.md) · [Project guide](README.md)
 
-These instructions cover Film Desk 1.4.0 for Apple Silicon (M-series) Macs running macOS 26 or later. This download does not run on Intel Macs or Windows.
+These instructions cover Film Desk 1.5.0 for Apple Silicon (M-series) Macs running macOS 26 or later. This download does not run on Intel Macs or Windows.
 
 ## Download and install
 
-Download from the [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.4.0) or the Baidu mirror linked in the README. Choose either DMG or ZIP.
+Download from the [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.0) for this version. The Baidu mirror in the README still contains version 1.4.0. Choose either DMG or ZIP.
 
 1. DMG: open the disk image, copy Film Desk.app into Applications, then eject the image.
 2. ZIP: extract it, then copy Film Desk.app into Applications.
@@ -35,22 +35,10 @@ Stop if macOS says the app is damaged, will damage your computer, or contains ma
 In Terminal, run this command for a DMG in your default Downloads folder; adjust the path if needed:
 
 ```sh
-shasum -a 256 "$HOME/Downloads/Film-Desk-1.4.0-macOS-arm64.dmg"
+shasum -a 256 "$HOME/Downloads/Film-Desk-1.5.0-macOS-arm64.dmg"
 ```
 
-Expected DMG digest:
-
-```text
-5c0109ce16c7270194c812ea1df49e1745d2af39142d5a3e26240d0d8de6edc1
-```
-
-Expected ZIP digest:
-
-```text
-0b87b65a7ae19e440105799bb28a9965093f8cae2e185ec6c98f3ee7e3f8dc61
-```
-
-For ZIP verification, change `.dmg` to `.zip` in the command. The release also includes SHA256SUMS. A match confirms identical bytes to the published file, not Apple security certification. Do not open a file with a different digest.
+Compare the result with the matching filename in `Film-Desk-1.5.0-SHA256SUMS.txt` on the release page. For ZIP verification, change `.dmg` to `.zip` in the command. A match confirms identical bytes to the published file, not Apple security certification. Do not open a file with a different digest.
 
 ## Access to your photo folder
 
