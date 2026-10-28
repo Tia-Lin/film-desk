@@ -15,9 +15,9 @@ exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Film Desk',console=False,
     icon=str(root/'assets/FilmDesk.icns'))
 coll=COLLECT(exe,a.binaries,a.datas,name='Film Desk')
 app=BUNDLE(coll,name='Film Desk.app',icon=str(root/'assets/FilmDesk.icns'),
-    bundle_identifier='local.filmdesk.app',version='1.5.0',
+    bundle_identifier='local.filmdesk.app',version='1.5.1',
     info_plist={
-        'CFBundleVersion':'1.5.0','LSMinimumSystemVersion':'26.0',
+        'CFBundleVersion':'1.5.1','LSMinimumSystemVersion':'26.0',
         'NSHumanReadableCopyright':'Film Desk 2026. MIT license; third-party notices included.',
         'CFBundleDocumentTypes':[{'CFBundleTypeName':'Film Desk session',
             'CFBundleTypeRole':'Editor','LSHandlerRank':'Alternate',

@@ -21,7 +21,7 @@ def synthetic_frame(h=120,w=180):
 class EngineTests(unittest.TestCase):
     def test_density_inversion_is_monotonic_and_neutral(self):
         frame,ref=synthetic_frame()
-        out,model=render(frame,Adjustments(),ref)
+        out,model=render(frame,Adjustments(mirror=False),ref)
         self.assertTrue(np.all(np.diff(out[60,:,0].astype(int))>=0))
         self.assertLessEqual(int(np.max(np.ptp(out.astype(int),axis=2))),1)
         self.assertLess(out[0,0,0],15)
@@ -48,11 +48,22 @@ class EngineTests(unittest.TestCase):
 
     def test_orientation_matches_crop_and_mirror(self):
         frame,ref=synthetic_frame()
-        a=Adjustments(crop=[.1,.2,.9,.8])
+        a=Adjustments(crop=[.1,.2,.9,.8],mirror=False)
         base,model=render(frame,a,ref)
         a.rotation=1;a.mirror=True
         oriented,_=render(frame,a,ref,model=model)
         np.testing.assert_array_equal(oriented,np.rot90(base[:,::-1],-1))
+
+    def test_new_scans_flip_but_saved_orientation_is_preserved(self):
+        frame,ref=synthetic_frame()
+        unflipped,_=render(frame,Adjustments(mirror=False),ref)
+        flipped,_=render(frame,Adjustments(),ref)
+        np.testing.assert_array_equal(flipped,unflipped[:,::-1])
+        for saved,expected in [({},False),({'mirror':False},False),({'mirror':True},True)]:
+            restored=Adjustments.from_dict(saved)
+            self.assertEqual(restored.mirror,expected)
+            actual,_=render(frame,restored,ref)
+            np.testing.assert_array_equal(actual,flipped if expected else unflipped)
 
     def test_black_and_white_keeps_channels_equal(self):
         frame,ref=synthetic_frame()

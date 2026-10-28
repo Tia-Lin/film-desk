@@ -19,7 +19,7 @@ import numpy as np
 import rawpy
 from PIL import Image, ImageCms, ImageFilter
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 RAW_EXTENSIONS = {".arw", ".dng", ".nef", ".nrw", ".cr2", ".cr3", ".raf", ".orf", ".rw2", ".pef", ".srw", ".raw"}
 SRGB_PROFILE = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
 _CAMERA_MATRICES = {}
@@ -31,7 +31,7 @@ class Adjustments:
     film_stock: str = ""  # Legacy session metadata; never used for conversion.
     crop: list[float] = field(default_factory=lambda: [0., 0., 1., 1.])
     rotation: int = 0
-    mirror: bool = False
+    mirror: bool = True
     exposure: float = 0.
     contrast: float = 1.
     saturation: float = 1.
@@ -46,7 +46,11 @@ class Adjustments:
 
     @classmethod
     def from_dict(cls, data):
-        obj = cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+        values = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        # Older sessions without this field were unflipped. Preserve that intent
+        # and their confirmed-export signatures; only fresh scans use the default.
+        values.setdefault("mirror", False)
+        obj = cls(**values)
         obj.crop = clean_crop(obj.crop)
         obj.rotation = int(obj.rotation) % 4
         if obj.color_mode not in {"Auto color", "Roll color", "Black & white"}:

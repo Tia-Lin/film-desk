@@ -8,8 +8,8 @@ A simple, offline Mac app for turning camera-scanned film negatives into positiv
 
 ## Downloads and first launch
 
-- [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.0): DMG, ZIP, checksums, and installation instructions.
-- [Baidu Netdisk mirror](https://pan.baidu.com/s/15wbCfAXCBIA4cL81iml-Tg?pwd=2333), extraction code **2333**: the older 1.4.0 DMG, ZIP, and checksum file; it does not include uneven-light correction. Use GitHub for 1.5.0. Platform availability and download requirements can change.
+- [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.1): DMG, ZIP, checksums, and installation instructions.
+- [Baidu Netdisk mirror](https://pan.baidu.com/s/15wbCfAXCBIA4cL81iml-Tg?pwd=2333), extraction code **2333**: the older 1.4.0 DMG, ZIP, and checksum file; it does not include uneven-light correction. Use GitHub for 1.5.1. Platform availability and download requirements can change.
 
 Choose DMG or ZIP. The build is locally ad hoc signed, without a Developer ID signature or Apple notarization. If macOS blocks the first launch, follow the [installation guide](INSTALL.md) for Apple's per-app Open Anyway procedure. Baidu sign-in or client requirements depend on its current download flow.
 
@@ -77,7 +77,7 @@ The **Advanced** section starts closed. It contains optional controls:
 
 - **Green / magenta, Shadow brightness, Highlight brightness, Film response** — extra color and tone adjustments.
 - **Roll matching** — tune a representative positive and choose **Match roll to this photo**, then **Apply adjustments to roll**. This shares one response across similar frames. Automatic per photo otherwise estimates a response separately for each photo. Roll matching is available for color output.
-- **Flip horizontally** — correct reversed writing or a mirrored scan. **Restore automatic crop** replaces a manual rectangle. **Use this crop for all photos** is useful only when the frame positions are consistent.
+- **Flip horizontally** — on by default for newly imported scans, in previews and JPEG exports. Turn it off if writing appears reversed. Saved sessions preserve their orientation, including older sessions without a flip setting. **Restore automatic crop** replaces a manual rectangle. **Use this crop for all photos** is useful only when the frame positions are consistent.
 - **Refresh roll thumbnails** — rebuild previews after changes across the roll. **Highlight lost detail** shows clipped highlights in red and shadows in blue; the overlay is not exported.
 - **Save adjustments… / Load saved adjustments…** — name real tuning and apply it to the current photo in a future session. Use Apply adjustments to roll to copy it to the other photos. Saved tuning from older versions remains available; a saved name identifies actual adjustments, not a measured film profile. Crops, orientation, and sampled neutral balance are not included.
 - **Blank reference** — choose an external blank frame, replace the reference, or remove it.

@@ -2,11 +2,11 @@
 
 [简体中文](INSTALL.zh-CN.md) · [Project guide](README.md)
 
-These instructions cover Film Desk 1.5.0 for Apple Silicon (M-series) Macs running macOS 26 or later. This download does not run on Intel Macs or Windows.
+These instructions cover Film Desk 1.5.1 for Apple Silicon (M-series) Macs running macOS 26 or later. This download does not run on Intel Macs or Windows.
 
 ## Download and install
 
-Download from the [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.0) for this version. The Baidu mirror in the README still contains version 1.4.0. Choose either DMG or ZIP.
+Download from the [GitHub release](https://github.com/Tia-Lin/film-desk/releases/tag/v1.5.1) for this version. The Baidu mirror in the README still contains version 1.4.0. Choose either DMG or ZIP.
 
 1. DMG: open the disk image, copy Film Desk.app into Applications, then eject the image.
 2. ZIP: extract it, then copy Film Desk.app into Applications.
@@ -35,10 +35,10 @@ Stop if macOS says the app is damaged, will damage your computer, or contains ma
 In Terminal, run this command for a DMG in your default Downloads folder; adjust the path if needed:
 
 ```sh
-shasum -a 256 "$HOME/Downloads/Film-Desk-1.5.0-macOS-arm64.dmg"
+shasum -a 256 "$HOME/Downloads/Film-Desk-1.5.1-macOS-arm64.dmg"
 ```
 
-Compare the result with the matching filename in `Film-Desk-1.5.0-SHA256SUMS.txt` on the release page. For ZIP verification, change `.dmg` to `.zip` in the command. A match confirms identical bytes to the published file, not Apple security certification. Do not open a file with a different digest.
+Compare the result with the matching filename in `Film-Desk-1.5.1-SHA256SUMS.txt` on the release page. For ZIP verification, change `.dmg` to `.zip` in the command. A match confirms identical bytes to the published file, not Apple security certification. Do not open a file with a different digest.
 
 ## Access to your photo folder
 

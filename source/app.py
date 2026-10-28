@@ -531,7 +531,7 @@ class FilmDesk(QMainWindow):
         self.match_roll_button=self.button("Match roll to this photo",self.set_roll_color,tip="Use this photo's automatic color response for the roll. Apply adjustments to roll to use it on every photo.")
         advanced.addWidget(self.match_roll_button)
         advanced.addWidget(self.section("Crop and orientation"))
-        self.mirror_button=self.button("Flip horizontally",self.mirror,checkable=True,tip="Reverse left and right if writing or the photo appears mirrored.")
+        self.mirror_button=self.button("Flip horizontally",self.mirror,checkable=True,tip="On by default for new scans. Turn off if writing or the photo appears reversed. Saved sessions keep their orientation.")
         advanced.addWidget(self.mirror_button)
         self.auto_crop_button=self.button("Restore automatic crop",self.automatic_crop,tip="Replace the current crop with the app's automatic estimate.")
         advanced.addWidget(self.auto_crop_button)

@@ -41,6 +41,8 @@ class WorkflowTest(unittest.TestCase):
                     self.assertEqual(errors,[])
                 window.load_folder(folder);drain()
                 self.assertEqual(len(window.paths),34)
+                self.assertTrue(all(a.mirror for a in window.adjustments.values()))
+                self.assertTrue(window.mirror_button.isChecked())
                 self.assertTrue(all(not window.list.item(i).icon().isNull() for i in range(34)))
                 self.assertTrue(window.advanced_panel.isHidden())
                 window.use_current_reference();drain()

@@ -236,5 +236,6 @@
   "Uneven-light correction skipped: use a reference photographed at the same aperture.": "未应用照明不均校正：请使用相同光圈拍摄的参考。",
   "Uneven-light correction skipped: crop this photo inside the area covered by the blank reference.": "未应用照明不均校正：请将照片裁切到空白参考覆盖的范围内。",
   "Set the blank reference again.": "请重新设置空白参考。",
-  "Uneven-light correction was not applied to {p0} exported photos. See the export report for filenames and reasons.": "有 {p0} 张导出照片未应用照明不均校正，文件名和原因见导出报告。"
+  "Uneven-light correction was not applied to {p0} exported photos. See the export report for filenames and reasons.": "有 {p0} 张导出照片未应用照明不均校正，文件名和原因见导出报告。",
+  "On by default for new scans. Turn off if writing or the photo appears reversed. Saved sessions keep their orientation.": "新导入的翻拍照片默认开启。若文字或画面左右反转，可将其关闭。已保存会话保留原有方向。"
 }
